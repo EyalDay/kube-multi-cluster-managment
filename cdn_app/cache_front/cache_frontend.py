@@ -26,7 +26,10 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 console = logging.StreamHandler()
 logger.addHandler(console)
-connection = fake_connection.FakeConnection(latency_ms=100, bandwidth_kbps=500 * 1024)
+
+latecy = os.getenv('BE_LATENCY_MS', 20)
+bw = os.getenv('BE_BW_KBPS', 500 * 1024)  # 500 mbps
+connection = fake_connection.FakeConnection(latency_ms=latecy, bandwidth_kbps=bw)
 
 
 @app.route('/health', methods=['GET'])
@@ -70,16 +73,19 @@ def get_object():
         cache_miss += 1
         logger.info(f'cache miss {cache_miss} {cache_hits}')
         be = os.getenv('CACHE_BACKEND_SERVICE_NAME', 'cache-backend-service')
-        target = F"http://{be}.default.svc.cluster.local:8081/load"
-        config = {'network_params': {"object_size_mb": obj_size_mb, "object_ttl_sec": obj_ttl_sec}}
-
+        namespace = os.getenv('NAMESPACE_NAME', 'default')
+        cluster= os.getenv('m', 'netwroking-cdn')
+        target = F"http://{be}.{namespace}.svc.{cluster}.local:8081/load"
+        json_data = {'network_params': {"object_size_mb": obj_size_mb, "object_ttl_sec": obj_ttl_sec}}
+        logger.debug(f'Sending post request to {target} with {json.dumps(json_data)}')
         current_objects[obj_hash] = CacheObj(ttl_ts=time.monotonic() + obj_ttl_sec,
                                              data=connection.receive(obj_size_mb * 1024), uuid=obj_hash,
                                              size_mb=obj_size_mb)
     try:
-        requests.post(target, data=None, json=config, timeout=0.05)
+        timeout = os.getenv('CACHE_BACKEND_TIMEOUT', 0.1)
+        requests.post(target, data=None, json=json_data, timeout=float(timeout))
     except requests.exceptions.ConnectionError:
-        logger.info('failed to issue post command to ', target)
+        logger.info(f'failed to issue post command to {target}')
 
     return json.dumps({"cache_stats": {"hits": cache_hits, "miss": cache_miss}})
 
@@ -99,13 +105,13 @@ def _clean_objects(transaction_id):
 
     # case 2 - cache exceeded 30 gb
     max_size = os.getenv('MAX_CACHE_SIZE ', 30 * 1000)
-    total_size = sum([obj.size_mb for obj in current_objects.items()])
+    total_size = sum([obj.size_mb for obj in current_objects.values()])
     while total_size > max_size:
         logger.info(f'total size is now f{total_size}')
         pre = set(current_objects.keys())
-        min_time = min([obj.ttl_ts for obj in current_objects.items()])
+        min_time = min([obj.ttl_ts for obj in current_objects.values()])
         current_objects = {obj_hash: val for obj_hash, val in current_objects.items() if val.ttl_ts != min_time}
-        total_size = sum([obj.size_mb for obj in current_objects.items()])
+        total_size = sum([obj.size_mb for obj in current_objects.values()])
         diff = pre - set(current_objects.keys())
         if diff:
             logger.info(f'{transaction_id} Cleaned {len(diff)} objects: {diff} because cache exceeded max size')

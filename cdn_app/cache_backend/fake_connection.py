@@ -1,3 +1,4 @@
+import math
 import time
 import utils
 import logging
@@ -26,7 +27,7 @@ class FakeConnection:
         time.sleep(2 * self._latency_ms / 1000)  # Simulate the latency
         kbytes_received = 0
         data = []
-        kb_per_100_msec = self._bandwidth_kbps / 10
+        kb_per_100_msec = int(math.ceil(self._bandwidth_kbps / 10))
         while kbytes_received < kbytes_total:
             # Simulate 100 msec round trips
             kbytes_received += kb_per_100_msec

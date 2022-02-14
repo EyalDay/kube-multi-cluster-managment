@@ -4,7 +4,7 @@ RUN mkdir -p /app
 
 COPY /cache_backend/__init__.py /app
 COPY /cache_backend/cache_backend.py /app
-COPY /cache_backend//fake_connection.py /app
+COPY /cache_backend/fake_connection.py /app
 COPY /cache_backend/utils.py /app
 COPY /requirements.txt/ /app
 RUN pip3 install --no-cache-dir -r /app/requirements.txt

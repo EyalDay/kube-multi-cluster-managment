@@ -54,9 +54,9 @@ async def generate_memory_load(params, transaction_id):
     mem_chunk = memory_chunk(kb_count)
     await asyncio.sleep(duration_seconds)
 
-    def _del_obj(obj, transaction_id):
-        logger.debug(f'{transaction_id} deleting object')
-        del obj
+    #def _del_obj(obj, transaction_id):
+    #    logger.debug(f'{transaction_id} deleting object')
+    #    del obj
 
     # TODO take care of cleanup if needed
     # loop.call_later(duration_seconds, _del_obj, mem_chunk, transaction_id)
@@ -113,7 +113,7 @@ def generate_network_load(params, transaction_id):
 
 
 def _cleanup_thread():
-    logger.info(f'Starting cleaup thread')
+    logger.info(f'Starting cleanup thread')
     global current_objects
     while True:
         cleaned_objs = [obj.uuid for obj in current_objects if obj.ttl_ts <= time.monotonic()]
@@ -137,7 +137,6 @@ def get_stats():
 @app.route('/load', methods=['POST'])
 def load():
     transaction_id = uuid.uuid4()
-
     logger.info(f"{transaction_id} running load with options {request.json}")
     response = generate_network_load(request.json.get('network_params', None), transaction_id)
     return json.dumps(response)

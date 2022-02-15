@@ -26,8 +26,8 @@ sys.path.append(os.path.dirname(APP_ROOT))
 app = Flask(__name__)
 CORS(app)
 
-latecy = os.getenv('BE_LATENCY_MS', 100)
-bw = os.getenv('BE_BW_KBPS', 500 * 1024)  # 500 mbps
+latecy = int(os.getenv('BE_LATENCY_MS', 10))
+bw = int(os.getenv('BE_BW_KBPS', 1000 * 1024))  # 500 mbps
 connection = fake_connection.FakeConnection(latency_ms=latecy, bandwidth_kbps=bw)
 
 logger = logging.getLogger(__name__)
@@ -38,8 +38,6 @@ logger.addHandler(console)
 
 def memory_chunk(size_in_kb):
     l = []
-    logger.info(size_in_kb)
-    logger.info(type(size_in_kb))
     for i in range(0, int(size_in_kb)):
         l.append("*" * 1024)  # 1KB
     return l

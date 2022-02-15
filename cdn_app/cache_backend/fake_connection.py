@@ -1,11 +1,15 @@
 import math
 import time
-import utils
+#import utils
+import random
 import logging
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 console = logging.StreamHandler()
 logger.addHandler(console)
+
+def memory_chunk(size_in_kb):
+    return random.getrandbits(size_in_kb * 1024)
 
 class FakeConnection:
 
@@ -32,12 +36,11 @@ class FakeConnection:
             # Simulate 100 msec round trips
             kbytes_received += kb_per_100_msec
             # Use a real data chunk to simulate a real object
-            data.extend(utils.memory_chunk(kb_per_100_msec))
+            data.append(memory_chunk(kb_per_100_msec))
             #logger.info('sleep')
             time.sleep(100 / 1000)  # sleep 100 msec
 
         self._kbytes_rx += kbytes_received
-        assert len(data) >= kbytes_total, f'BUG! {len(data)} {kbytes_total}'
         return data
 
     @property

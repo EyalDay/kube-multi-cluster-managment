@@ -27,8 +27,8 @@ logger.setLevel(logging.DEBUG)
 console = logging.StreamHandler()
 logger.addHandler(console)
 
-latecy = os.getenv('BE_LATENCY_MS', 20)
-bw = os.getenv('BE_BW_KBPS', 500 * 1024)  # 500 mbps
+latecy = int(os.getenv('BE_LATENCY_MS', 20))
+bw = int(os.getenv('BE_BW_KBPS', 500 * 1024))  # 500 mbps
 connection = fake_connection.FakeConnection(latency_ms=latecy, bandwidth_kbps=bw)
 
 
@@ -72,20 +72,29 @@ def get_object():
             return json.dumps({"cache_stats": {"hits": cache_hits, "miss": cache_miss}})
         cache_miss += 1
         logger.info(f'cache miss {cache_miss} {cache_hits}')
-        be = os.getenv('CACHE_BACKEND_SERVICE_NAME', 'cache-backend-service')
+        be = os.getenv('CACHE_BACKEND_SERVICE_NAME', 'final-backend-service')
+        be_port = int(os.getenv('CACHE_BACKEND_PORT', 8081))
         namespace = os.getenv('NAMESPACE_NAME', 'default')
-        cluster= os.getenv('m', 'netwroking-cdn')
-        target = F"http://{be}.{namespace}.svc.{cluster}.local:8081/load"
+        cluster= os.getenv('CLUSTER_NAME', 'networking-final')
+        be_target = os.getenv('BE_TARGET', 'load')
+        explicit_target = os.getenv('EXPLICIT_TARGET', 'http://34.134.171.50:8081/load')
+
+        keep_object = bool(os.getenv('FRONTEND_KEEP_OBJ', False))
+        obj = connection.receive(obj_size_mb * 1024) if keep_object else None
+        current_objects[obj_hash] = CacheObj(ttl_ts=time.monotonic() + obj_ttl_sec,
+                                             data=obj, uuid=obj_hash,
+                                             size_mb=obj_size_mb)
+
+    target = explicit_target or f"http://{be}.{namespace}.svc.{cluster}.local:{be_port}/{be_target}"
+    try:
         json_data = {'network_params': {"object_size_mb": obj_size_mb, "object_ttl_sec": obj_ttl_sec}}
         logger.debug(f'Sending post request to {target} with {json.dumps(json_data)}')
-        current_objects[obj_hash] = CacheObj(ttl_ts=time.monotonic() + obj_ttl_sec,
-                                             data=connection.receive(obj_size_mb * 1024), uuid=obj_hash,
-                                             size_mb=obj_size_mb)
-    try:
-        timeout = os.getenv('CACHE_BACKEND_TIMEOUT', 0.1)
+        timeout = float(os.getenv('CACHE_BACKEND_TIMEOUT', 60))
         requests.post(target, data=None, json=json_data, timeout=float(timeout))
-    except requests.exceptions.ConnectionError:
-        logger.info(f'failed to issue post command to {target}')
+        logger.debug(f'DONE sending post request to {target} with {json.dumps(json_data)}')
+    except Exception as e:
+        logger.info(f'failed to issue post command to {target}: {e}')
+
 
     return json.dumps({"cache_stats": {"hits": cache_hits, "miss": cache_miss}})
 
@@ -104,7 +113,7 @@ def _clean_objects(transaction_id):
             logger.info(f'{transaction_id} Cleaned {len(diff)} objects: {diff} because their ttl passed')
 
     # case 2 - cache exceeded 30 gb
-    max_size = os.getenv('MAX_CACHE_SIZE ', 30 * 1000)
+    max_size = int(os.getenv('MAX_CACHE_SIZE ', 30 * 1000))
     total_size = sum([obj.size_mb for obj in current_objects.values()])
     while total_size > max_size:
         logger.info(f'total size is now f{total_size}')

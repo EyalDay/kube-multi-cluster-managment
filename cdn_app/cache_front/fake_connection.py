@@ -1,7 +1,12 @@
 import time
 
-import utils
+import math
 
+def memory_chunk(size_in_kb):
+    l = []
+    for i in range(0, int(math.ceil(size_in_kb))):
+        l.append("*" * 1024)  # 1KB
+    return l
 
 class FakeConnection:
 
@@ -27,7 +32,7 @@ class FakeConnection:
         while kbytes_sent < kbytes_total:
             # Simulate 100 msec round trips
             kbytes_sent += kb_per_100_msec
-            data.extend(utils.memory_chunk(kb_per_100_msec))
+            data.append(memory_chunk(kb_per_100_msec))
             time.sleep(100 / 1000)  # sleep 100 msec
             # Use a real data chunk to simulate a real object!
 
